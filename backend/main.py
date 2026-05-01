@@ -18,6 +18,10 @@ def health():
 
 @app.post("/recommendations")
 def recommendations(request: RecommendationRequest):
+    valid_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    if not all(day in valid_days for day in request.days):
+        raise HTTPException(status_code=400, detail="Invalid day(s) provided")
+    
     try:
         results = get_recommendations(
             request.days,
