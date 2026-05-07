@@ -19,15 +19,32 @@ def health():
 @app.post("/recommendations")
 def recommendations(request: RecommendationRequest):
     valid_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    # Validate input
     if not all(day in valid_days for day in request.days):
         raise HTTPException(status_code=400, detail="Invalid day(s) provided")
-    
+
     try:
         results = get_recommendations(
             request.days,
             request.start_hour,
             request.end_hour
         )
+
+        # Risk 1 fix: handle missing/empty API/data
+        if not results:
+            raise HTTPException(
+                status_code=503,
+                detail="Occupancy data unavailable"
+            )
+
         return {"recommendations": results}
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve occupancy data"
+        
