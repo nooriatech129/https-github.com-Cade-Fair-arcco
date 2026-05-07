@@ -1,13 +1,55 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+
+const API_URL = 'http://localhost:8000/recommendations';
+
+type Recommendation = {
+  id: string;
+  title: string;
+  description?: string;
+};
 
 export default function HomeScreen() {
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, []);
+
+  const fetchRecommendations = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          days: ['Mon'],
+          start_hour: 9,
+          end_hour: 17,
+        }),
+      });
+
+      if (!response.ok) throw new Error('API unavailable');
+
+      const data = await response.json();
+      setRecommendations(data.recommendations ?? []);
+
+    } catch (err) {
+      setError('Unable to load occupancy data right now.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -18,62 +60,37 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+        <ThemedText type="title">Recommendations</ThemedText>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
+      {loading && (
+        <ThemedView style={styles.stateContainer}>
+          <ActivityIndicator size="large" />
+          <ThemedText>Loading occupancy data...</ThemedText>
+        </ThemedView>
+      )}
+
+      {!loading && error && (
+        <ThemedView style={styles.stateContainer}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <ThemedText onPress={fetchRecommendations} style={styles.retryText}>
+            Tap to retry
+          </ThemedText>
+        </ThemedView>
+      )}
+
+      {!loading && !error && recommendations.length === 0 && (
+        <ThemedView style={styles.stateContainer}>
+          <ThemedText>No recommendations found.</ThemedText>
+        </ThemedView>
+      )}
+
+      {!loading && !error && recommendations.map((item) => (
+        <ThemedView key={item.id} style={styles.card}>
+          <ThemedText type="subtitle">{item.title}</ThemedText>
+          {item.description && <ThemedText>{item.description}</ThemedText>}
+        </ThemedView>
+      ))}
     </ParallaxScrollView>
   );
 }
@@ -83,10 +100,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
     marginBottom: 8,
+  },
+  stateContainer: {
+    alignItems: 'center',
+    gap: 8,
+    padding: 16,
+  },
+  card: {
+    gap: 4,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: '#e74c3c',
+    textAlign: 'center',
+  },
+  retryText: {
+    color: '#3498db',
+    textDecorationLine: 'underline',
   },
   reactLogo: {
     height: 178,
