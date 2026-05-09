@@ -1,50 +1,40 @@
+# backend/main.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from recommender import get_recommendations
+from typing import List
 
-app = FastAPI()
+pp = FastAPI()
 
+class OccupancySlot(BaseModel):
+    time_slot: str
+    occupancy_level: int  # 0–100 or similar
 
-class RecommendationRequest(BaseModel):
-    days: list[str]
-    start_hour: int
-    end_hour: int
+class OccupancyResponse(BaseModel):
+    location_id: str
+    slots: List[OccupancySlot]
 
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/recommendations")
-def recommendations(request: RecommendationRequest):
-    valid_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-    # Validate input
-    if not all(day in valid_days for day in request.days):
-        raise HTTPException(status_code=400, detail="Invalid day(s) provided")
-
+@app.get("/api/occupancy", response_model=OccupancyResponse)
+async def get_occupancy(location_id: str):
     try:
-        results = get_recommendations(
-            request.days,
-            request.start_hour,
-            request.end_hour
-        )
+        # TODO: replace with your real data source / logic
+        # Example dummy data:
+        data = {
+            "location_id": location_id,
+            "slots": [
+                {"time_slot": "09:00", "occupancy_level": 30},
+                {"time_slot": "10:00", "occupancy_level": 60},
+            ],
+        }
 
-        # Risk 1 fix: handle missing/empty API/data
-        if not results:
-            raise HTTPException(
-                status_code=503,
-                detail="Occupancy data unavailable"
-            )
+        # Basic validation
+        if "slots" not in data or not isinstance(data["slots"], list):
+            raise ValueError("Invalid data format: 'slots' missing or not a list")
 
-        return {"recommendations": results}
+        return data
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve occupancy data"
-        
+    except ValueError as ve:
+        # Schema / data issues
+        raise HTTPException(status_code=500, detail=f"Data error: {str(ve)}")
+    except Exception as e:
+        # Unexpected server error
+        raise HTTPException(status_code=500, detail="Internal server error")
